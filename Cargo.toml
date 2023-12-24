@@ -17,3 +17,4 @@ test_lib = []
 icecream = "0.1.0"
 pico-args = "0.5.0"
 regex = "1.10.2"
+pathfinding = "4.8"
