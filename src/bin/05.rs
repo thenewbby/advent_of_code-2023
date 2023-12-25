@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 type Link = (u32, u32);
 
-fn page_data_to_vec_link(table: &str) -> Vec<Link> {
+fn page_data_to_vec_link_from(table: &str) -> Vec<Link> {
     table
         .lines()
         .flat_map(|s| {
@@ -24,25 +24,54 @@ fn page_data_to_vec_link(table: &str) -> Vec<Link> {
         .collect()
 }
 
-fn find_path<'a>(conv_table: HashMap<&str, Node>) -> Vec<&'a str> {
-    let result = bfs(
+fn page_data_to_vec_link_to(table: &str) -> Vec<Link> {
+    table
+        .lines()
+        .flat_map(|s| {
+            let v: Vec<_> = s
+                .split_whitespace()
+                .map(|num| num.parse::<u32>().unwrap())
+                .collect();
+            // dbg!(v);
+            let mut end_v: Vec<(u32, u32)> = Vec::new();
+
+            for i in 0..v[2] {
+                end_v.push((v[1] + i, v[0] + i));
+            }
+            end_v
+        })
+        .collect()
+}
+
+fn find_path<'a>(conv_table: &'a HashMap<&'a str, Node<'a>>) -> std::vec::Vec<&'a Node<'a>> {
+    // let a: Option<Vec<&Node<'_>>> = bfs(
+    //     &conv_table.get("location").unwrap(),
+    //     |n| {
+    //         n.conversion_from
+    //             .keys()
+    //             .map(|s| conv_table.get(s).unwrap())
+    //             .collect::<Vec<&'a Node<'static>>>()
+    //     },
+    //     |n| n.name == "seed",
+    // );
+
+    let a: Option<Vec<&Node<'_>>> = bfs(
         &conv_table.get("location").unwrap(),
         |n| {
             n.conversion_from
-                .iter()
+                .keys()
                 .map(|s| conv_table.get(s).unwrap())
-                .collect::<Vec<&Node>>()
+                .collect::<Vec<_>>()
         },
         |n| n.name == "seed",
     );
-    dbg!(result);
-    Vec::new()
+    a.unwrap()
 }
 
 #[derive(Debug, Clone)]
 struct Node<'a> {
     name: &'a str,
-    conversion_from: Vec<&'a str>,
+    conversion_from: HashMap<&'a str, Vec<Link>>,
     conversion_to: HashMap<&'a str, Vec<Link>>,
 }
 
@@ -63,24 +92,47 @@ impl<'a> Node<'a> {
     fn new(nm: &'a str) -> Self {
         Node {
             name: nm,
+            conversion_from: HashMap::new(),
             conversion_to: HashMap::new(),
-            conversion_from: Vec::new(),
         }
     }
 
-    fn add_convertion(&mut self, to: &'a str, table: &'a str) {
-        self.conversion_to.insert(to, page_data_to_vec_link(table));
+    fn add_convertion_from(&mut self, from: &'a str, table: &'a str) {
+        self.conversion_from
+            .insert(from, page_data_to_vec_link_from(table));
     }
 
-    fn add_back_path(&mut self, from: &'a str) {
-        self.conversion_from.push(from);
+    fn add_convertion_to(&mut self, to: &'a str, table: &'a str) {
+        self.conversion_to
+            .insert(to, page_data_to_vec_link_to(table));
     }
+}
+
+fn transform_seed(seed: u32, transformations: &Vec<&Node<'_>>) -> u32 {
+    let mut val = seed;
+    for (i, trans) in transformations.iter().enumerate() {
+        if trans.name == "location" {
+        } else {
+            let conversion_table = trans
+                .conversion_to
+                .get(transformations[i + 1].name)
+                .unwrap();
+            for conv in conversion_table {
+                if conv.0 == val {
+                    // println!("{} {}", conv.0, conv.1);
+                    val = conv.1;
+                    break;
+                }
+            }
+            // println!("{}  {}", transformations[i + 1].name, val);
+        }
+    }
+    val
 }
 
 use regex::Regex;
 
 pub fn part_one(input: &str) -> Option<u32> {
-    // println!("{}", input);
     let seed_regex = Regex::new(r"seeds: (.+)").unwrap();
 
     let conversion_regex = Regex::new(r"(\w+)-to-(\w+) map:\n((?:.+\n)+)").unwrap();
@@ -97,9 +149,11 @@ pub fn part_one(input: &str) -> Option<u32> {
         .collect();
 
     let conv_iter = conversion_regex.captures_iter(input);
+    println!("conv_iter");
 
     for conv in conv_iter {
         let (_, [from, to, table]) = conv.extract();
+        println!("from {}  to {} ", from, to);
 
         if !conversions.contains_key(from) {
             conversions.insert(from, Node::new(from));
@@ -108,14 +162,36 @@ pub fn part_one(input: &str) -> Option<u32> {
             conversions.insert(to, Node::new(to));
         }
 
-        conversions.get_mut(from).unwrap().add_convertion(to, table);
-        conversions.get_mut(to).unwrap().add_back_path(from);
+        conversions
+            .get_mut(to)
+            .unwrap()
+            .add_convertion_from(from, table);
+
+        conversions
+            .get_mut(from)
+            .unwrap()
+            .add_convertion_to(to, table);
     }
+    println!("Find path");
     // dbg!(conversions);
+    let mut path: Vec<&Node<'_>> = find_path(&conversions);
+    println!("Finded path");
+    // dbg!(path);
 
-    let path: Vec<&str> = find_path(conversions);
-
-    None
+    // for p in &path {
+    //     println!("{}", p.name);
+    // }
+    path.reverse();
+    // for p in &path {
+    //     println!("{}", p.name);
+    // }
+    let mut position: Vec<u32> = Vec::new();
+    for seed in seeds {
+        let pos = transform_seed(seed, &path);
+        position.push(pos);
+    }
+    println!("{:?}", position);
+    Some(position.iter().min().unwrap().to_owned())
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
