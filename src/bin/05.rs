@@ -1,25 +1,20 @@
 advent_of_code::solution!(5);
 
+use itertools::Itertools;
 use pathfinding::directed::bfs::bfs;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-type Link = (u32, u32);
+
+type Link = (u64, u64, u64);
 
 fn page_data_to_vec_link_from(table: &str) -> Vec<Link> {
     table
         .lines()
-        .flat_map(|s| {
-            let v: Vec<_> = s
-                .split_whitespace()
-                .map(|num| num.parse::<u32>().unwrap())
-                .collect();
-            // dbg!(v);
-            let mut end_v: Vec<(u32, u32)> = Vec::new();
-
-            for i in 0..v[2] {
-                end_v.push((v[0] + i, v[1] + i));
-            }
-            end_v
+        .map(|s| {
+            s.split_whitespace()
+                .map(|num| num.parse::<u64>().unwrap())
+                .collect_tuple()
+                .unwrap()
         })
         .collect()
 }
@@ -27,18 +22,13 @@ fn page_data_to_vec_link_from(table: &str) -> Vec<Link> {
 fn page_data_to_vec_link_to(table: &str) -> Vec<Link> {
     table
         .lines()
-        .flat_map(|s| {
-            let v: Vec<_> = s
+        .map(|s| {
+            let t: Link = s
                 .split_whitespace()
-                .map(|num| num.parse::<u32>().unwrap())
-                .collect();
-            // dbg!(v);
-            let mut end_v: Vec<(u32, u32)> = Vec::new();
-
-            for i in 0..v[2] {
-                end_v.push((v[1] + i, v[0] + i));
-            }
-            end_v
+                .map(|num| num.parse::<u64>().unwrap())
+                .collect_tuple()
+                .unwrap();
+            (t.1, t.0, t.2)
         })
         .collect()
 }
@@ -109,7 +99,7 @@ impl<'a> Node<'a> {
 }
 
 fn transform_seed(seed: u32, transformations: &Vec<&Node<'_>>) -> u32 {
-    let mut val = seed;
+    let mut val: u64 = seed as u64;
     for (i, trans) in transformations.iter().enumerate() {
         if trans.name == "location" {
         } else {
@@ -117,17 +107,24 @@ fn transform_seed(seed: u32, transformations: &Vec<&Node<'_>>) -> u32 {
                 .conversion_to
                 .get(transformations[i + 1].name)
                 .unwrap();
+            // println!("{} transform  {}", transformations[i + 1].name, val);
             for conv in conversion_table {
-                if conv.0 == val {
-                    // println!("{} {}", conv.0, conv.1);
-                    val = conv.1;
+                if conv.0 <= val && val <= conv.0 + conv.2 {
+                    // println!(
+                    //     "{} {} {}     {}",
+                    //     conv.0,
+                    //     conv.1,
+                    //     conv.2,
+                    //     val + conv.1 - conv.0
+                    // );
+                    val = val + conv.1 - conv.0;
                     break;
                 }
             }
             // println!("{}  {}", transformations[i + 1].name, val);
         }
     }
-    val
+    val as u32
 }
 
 use regex::Regex;
@@ -149,11 +146,11 @@ pub fn part_one(input: &str) -> Option<u32> {
         .collect();
 
     let conv_iter = conversion_regex.captures_iter(input);
-    println!("conv_iter");
+    // println!("conv_iter");
 
     for conv in conv_iter {
         let (_, [from, to, table]) = conv.extract();
-        println!("from {}  to {} ", from, to);
+        // println!("from {}  to {} ", from, to);
 
         if !conversions.contains_key(from) {
             conversions.insert(from, Node::new(from));
@@ -172,10 +169,10 @@ pub fn part_one(input: &str) -> Option<u32> {
             .unwrap()
             .add_convertion_to(to, table);
     }
-    println!("Find path");
+    // println!("Find path");
     // dbg!(conversions);
     let mut path: Vec<&Node<'_>> = find_path(&conversions);
-    println!("Finded path");
+    // println!("Finded path");
     // dbg!(path);
 
     // for p in &path {
@@ -190,7 +187,7 @@ pub fn part_one(input: &str) -> Option<u32> {
         let pos = transform_seed(seed, &path);
         position.push(pos);
     }
-    println!("{:?}", position);
+    // println!("{:?}", position);
     Some(position.iter().min().unwrap().to_owned())
 }
 
