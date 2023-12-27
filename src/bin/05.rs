@@ -127,6 +127,27 @@ fn transform_seed(seed: u32, transformations: &Vec<&Node<'_>>) -> u32 {
     val as u32
 }
 
+fn transform_seed_range(seed_range: (u32, u32), transformations: &Vec<&Node<'_>>) -> (u32, u32) {
+    let mut beg: u64 = seed_range.0 as u64;
+    let mut end: u64 = seed_range.1 as u64;
+    for (i, trans) in transformations.iter().enumerate() {
+        if trans.name == "location" {
+        } else {
+            let conversion_table = trans
+                .conversion_to
+                .get(transformations[i + 1].name)
+                .unwrap();
+            // println!("{} transform  {}", transformations[i + 1].name, val);
+            for conv in conversion_table {
+                
+                }
+            }
+            // println!("{}  {}", transformations[i + 1].name, val);
+        }
+    }
+    val as u32
+}
+
 use regex::Regex;
 
 pub fn part_one(input: &str) -> Option<u32> {
@@ -192,7 +213,68 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let seed_regex = Regex::new(r"seeds: (.+)").unwrap();
+
+    let conversion_regex = Regex::new(r"(\w+)-to-(\w+) map:\n((?:.+\n)+)").unwrap();
+
+    let mut conversions: HashMap<&str, Node> = HashMap::new();
+
+    let seed_cap: regex::Captures<'_> = seed_regex.captures(input).unwrap();
+    let seeds: Vec<u32> = seed_cap
+        .get(1)
+        .unwrap()
+        .as_str()
+        .split_whitespace()
+        .map(|num| num.parse::<u32>().unwrap())
+        .collect();
+
+    let conv_iter = conversion_regex.captures_iter(input);
+    // println!("conv_iter");
+
+    for conv in conv_iter {
+        let (_, [from, to, table]) = conv.extract();
+        // println!("from {}  to {} ", from, to);
+
+        if !conversions.contains_key(from) {
+            conversions.insert(from, Node::new(from));
+        }
+        if !conversions.contains_key(to) {
+            conversions.insert(to, Node::new(to));
+        }
+
+        conversions
+            .get_mut(to)
+            .unwrap()
+            .add_convertion_from(from, table);
+
+        conversions
+            .get_mut(from)
+            .unwrap()
+            .add_convertion_to(to, table);
+    }
+    // println!("Find path");
+    // dbg!(conversions);
+    let mut path: Vec<&Node<'_>> = find_path(&conversions);
+    // println!("Finded path");
+    // dbg!(path);
+
+    // for p in &path {
+    //     println!("{}", p.name);
+    // }
+    path.reverse();
+    // for p in &path {
+    //     println!("{}", p.name);
+    // }
+    let mut position: Vec<u32> = Vec::new();
+    for index in (0..seeds.len()).step_by(2) {
+        // println!("{} {}", seeds[index], seeds[index + 1]);
+        for seed in seeds[index]..(seeds[index] + seeds[index + 1]) {
+            let pos = transform_seed_range(seed, &path);
+            position.push(pos);
+        }
+    }
+    println!("{:?}", position);
+    Some(position.iter().min().unwrap().to_owned())
 }
 
 #[cfg(test)]
@@ -208,6 +290,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(46));
     }
 }
