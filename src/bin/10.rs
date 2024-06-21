@@ -1,10 +1,52 @@
 use std::cell::{Ref, RefCell};
 use std::collections::VecDeque;
+use std::fmt;
 use std::rc::Rc;
 advent_of_code::solution!(10);
 
 type Position = (usize, usize);
 type Size = (usize, usize);
+
+struct Map {
+    nodes: Vec<Vec<Rc<RefCell<Node>>>>,
+}
+
+impl Map {
+    fn new(nodes: Vec<Vec<Rc<RefCell<Node>>>>) -> Self {
+        Self { nodes }
+    }
+
+    fn get(&self, pos: Position) -> Rc<RefCell<Node>> {
+        self.nodes[pos.0][pos.1].clone()
+    }
+
+    fn get_size(&self) -> Size {
+        (self.nodes.len(), self.nodes[0].len())
+    }
+}
+
+impl fmt::Display for Map {
+    // This trait requires `fmt` with this exact signature.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut s = String::new();
+        for v in self.nodes.clone() {
+            for n in v {
+                let n_burrow = n.borrow();
+                if let Some(_) = n_burrow.visited_from {
+                    if let Some(i) = char::from_digit(n_burrow.jump as u32, 10) {
+                        s.push(i);
+                    } else {
+                        s.push('x');
+                    }
+                } else {
+                    s.push(n_burrow.c);
+                }
+            }
+            s.push('\n');
+        }
+        write!(f, "{}", s)
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Direction {
@@ -216,62 +258,67 @@ impl Node {
 //         .filter(move |&q| p != q)
 // }
 
-fn bfs(map: &mut [Vec<Rc<RefCell<Node>>>], start: Position) -> u64 {
+fn bfs(map: &mut Map, start: Position) -> u64 {
     let mut node_to_proc: VecDeque<Rc<RefCell<Node>>> = VecDeque::new();
-    let map_size: Size = (map.len(), map[0].len());
+    let map_size: Size = map.get_size();
 
     if (start.0 > 0)
-        & map[(start.0 as i32 - 1) as usize][start.1]
-            .borrow()
-            .pipe_direction
-            .has_north()
-    {
-        map[(start.0 as i32 - 1) as usize][start.1]
-            .borrow_mut()
-            .set_direction(Some(Direction::S), 0);
-        node_to_proc.push_back(map[(start.0 as i32 - 1) as usize][start.1].clone());
-        println!("Push 0 -1");
-    }
-    if (start.0 < map_size.0)
-        & map[(start.0 as i32 + 1) as usize][start.1]
+        && map
+            .get(((start.0 as i32 - 1) as usize, start.1))
             .borrow()
             .pipe_direction
             .has_south()
     {
-        map[(start.0 as i32 + 1) as usize][start.1]
+        map.get(((start.0 as i32 - 1) as usize, start.1))
+            .borrow_mut()
+            .set_direction(Some(Direction::S), 0);
+        node_to_proc.push_back(map.get(((start.0 as i32 - 1) as usize, start.1)));
+        println!("Push 0 -1");
+    }
+    if (start.0 < map_size.0)
+        && map
+            .get(((start.0 as i32 + 1) as usize, start.1))
+            .borrow()
+            .pipe_direction
+            .has_north()
+    {
+        map.get(((start.0 as i32 + 1) as usize, start.1))
             .borrow_mut()
             .set_direction(Some(Direction::N), 0);
-        node_to_proc.push_back(map[(start.0 as i32 + 1) as usize][start.1].clone());
+        node_to_proc.push_back(map.get(((start.0 as i32 + 1) as usize, start.1)));
         println!("Push 0 + 1");
     }
 
     if (start.1 > 0)
-        & map[start.0][(start.1 as i32 - 1) as usize]
-            .borrow()
-            .pipe_direction
-            .has_west()
-    {
-        map[start.0][(start.1 as i32 - 1) as usize]
-            .borrow_mut()
-            .set_direction(Some(Direction::E), 0);
-        node_to_proc.push_back(map[start.0][(start.1 as i32 - 1) as usize].clone());
-        println!("Push 1 - 1");
-    }
-    if (start.1 < map_size.1)
-        & map[start.0][(start.1 as i32 + 1) as usize]
+        && map
+            .get((start.0, (start.1 as i32 - 1) as usize))
             .borrow()
             .pipe_direction
             .has_east()
     {
-        map[start.0][(start.1 as i32 + 1) as usize]
+        map.get((start.0, (start.1 as i32 - 1) as usize))
+            .borrow_mut()
+            .set_direction(Some(Direction::E), 0);
+        node_to_proc.push_back(map.get((start.0, (start.1 as i32 - 1) as usize)));
+        println!("Push 1 - 1");
+    }
+    if (start.1 < map_size.1)
+        && map
+            .get((start.0, (start.1 as i32 + 1) as usize))
+            .borrow()
+            .pipe_direction
+            .has_west()
+    {
+        map.get((start.0, (start.1 as i32 + 1) as usize))
             .borrow_mut()
             .set_direction(Some(Direction::W), 0);
-        node_to_proc.push_back(map[start.0][(start.1 as i32 + 1) as usize].clone());
+        node_to_proc.push_back(map.get((start.0, (start.1 as i32 + 1) as usize)));
         println!("Push 1 + 1");
     }
     let mut max_jump = 0;
     while !node_to_proc.is_empty() {
-        let n = dbg!(node_to_proc.pop_front().unwrap());
+        // let n = dbg!(node_to_proc.pop_front().unwrap());
+        let n = node_to_proc.pop_front().unwrap();
         {
             let n = n.borrow();
             if n.jump > max_jump {
@@ -280,17 +327,18 @@ fn bfs(map: &mut [Vec<Rc<RefCell<Node>>>], start: Position) -> u64 {
             push_next_node(n, &mut node_to_proc, map);
         }
     }
-    println!("{}", max_jump);
+    // println!("{}", max_jump);
     return max_jump;
 }
 
-fn visite_next_node(n: Ref<Node>, map: &mut [Vec<Rc<RefCell<Node>>>]) -> Option<Rc<RefCell<Node>>> {
+fn visite_next_node(n: Ref<Node>, map: &mut Map) -> Option<Rc<RefCell<Node>>> {
     if let Some(next_dir) = n.get_next_direction() {
-        let next_pos = dbg!(n.get_next_position());
+        // let next_pos = dbg!(n.get_next_position());
+        let next_pos = n.get_next_position();
 
         match next_pos {
             Some(pos) => {
-                let next_node = map[pos.0][pos.1].clone();
+                let next_node = map.get(pos);
                 if !next_node.borrow().is_accessible(&next_dir) | next_node.borrow().is_visited() {
                     None
                 } else {
@@ -307,35 +355,35 @@ fn visite_next_node(n: Ref<Node>, map: &mut [Vec<Rc<RefCell<Node>>>]) -> Option<
     }
 }
 
-fn push_next_node(
-    n: Ref<Node>,
-    queue: &mut VecDeque<Rc<RefCell<Node>>>,
-    map: &mut [Vec<Rc<RefCell<Node>>>],
-) {
+fn push_next_node(n: Ref<Node>, queue: &mut VecDeque<Rc<RefCell<Node>>>, map: &mut Map) {
     if let Some(node) = visite_next_node(n, map) {
         queue.push_back(node)
     }
 }
 
-pub fn part_one(input: &str) -> Option<u64> {
+fn part_one(input: &str) -> Option<u64> {
     let mut start: Position = (0, 0);
-    let mut map: Vec<Vec<Rc<RefCell<Node>>>> = input
-        .lines()
-        .enumerate()
-        .map(|(line_num, l)| {
-            l.chars()
-                .enumerate()
-                .map(|(char_num, c)| {
-                    if c == 'S' {
-                        start = (line_num, char_num);
-                    }
-                    Rc::new(RefCell::new(Node::new(c, (line_num, char_num))))
-                })
-                .collect()
-        })
-        .collect();
+    let mut map: Map = Map::new(
+        input
+            .lines()
+            .enumerate()
+            .map(|(line_num, l)| {
+                l.chars()
+                    .enumerate()
+                    .map(|(char_num, c)| {
+                        if c == 'S' {
+                            start = (line_num, char_num);
+                        }
+                        Rc::new(RefCell::new(Node::new(c, (line_num, char_num))))
+                    })
+                    .collect()
+            })
+            .collect(),
+    );
 
-    let max = bfs(map.as_mut_slice(), start);
+    // println!("{}", map);
+    let max = bfs(&mut map, start);
+    // println!("{}", map);
     // dbg!(start);
     // dbg!(map);
     return Some(max);
@@ -353,7 +401,7 @@ mod tests {
     fn test_part_one() {
         let result = part_one(&advent_of_code::template::read_file("examples", DAY));
         // assert_eq!(result, Some(4));
-        assert_eq!(result, Some(0));
+        assert_eq!(result, Some(8));
     }
 
     #[test]
