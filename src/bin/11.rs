@@ -66,18 +66,18 @@ impl GalaxieMap {
         )
     }
 
-    fn expand_map(&mut self) {
+    fn expand_map(&mut self, value: usize) {
         for i in (0..self.size.0).rev() {
             if !self.galaxies.iter().any(|g| g.position.0 == i) {
                 // println!("No galaxies in y {}", i);
                 for galaxie in &mut self.galaxies {
                     if galaxie.position.0 > i {
                         // print!("\t galaxies shifted {:?} ", galaxie.position);
-                        galaxie.position.0 += 1;
+                        galaxie.position.0 += value;
                         // println!("to {:?}", galaxie.position);
                     }
                 }
-                self.size.0 += 1;
+                self.size.0 += value;
             }
         }
 
@@ -86,10 +86,10 @@ impl GalaxieMap {
                 // println!("No galaxies in x {}", i);
                 for galaxie in &mut self.galaxies {
                     if galaxie.position.1 > i {
-                        galaxie.position.1 += 1;
+                        galaxie.position.1 += value;
                     }
                 }
-                self.size.1 += 1;
+                self.size.1 += value;
             }
         }
     }
@@ -114,13 +114,19 @@ pub fn part_one(input: &str) -> Option<u64> {
 
     // println!("{:?}", galaxies);
 
-    galaxies.expand_map();
+    galaxies.expand_map(1);
     println!("{:?}", galaxies);
     Some(galaxies.get_shotest_path_comb())
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let mut galaxies: GalaxieMap = GalaxieMap::from_input(input);
+
+    // println!("{:?}", galaxies);
+
+    galaxies.expand_map(1000000 - 1);
+    println!("{:?}", galaxies);
+    Some(galaxies.get_shotest_path_comb())
 }
 
 #[cfg(test)]
@@ -136,6 +142,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(8410));
     }
 }
